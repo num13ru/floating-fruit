@@ -15,6 +15,7 @@ const POLL_CHECK: Duration = Duration::from_millis(50);
 const COMMAND_SETTLE: Duration = Duration::from_millis(200);
 const INTERPOLATION_STEP: Duration = Duration::from_millis(200);
 const SEEK_CONFIRM_TOLERANCE: f64 = 2.0;
+const ART_CACHE_CAP: usize = 10;
 
 type PollResult = Result<Option<music::TrackInfo>>;
 
@@ -35,6 +36,8 @@ pub struct App {
     pub(crate) pending_seek_position: Option<f64>,
     poll_instant: Instant,
     last_track_id: Option<i64>,
+    last_album_key: Option<String>,
+    art_cache: Vec<(String, TextureHandle)>,
     poll_pending: bool,
     next_poll: Instant,
     work_tx: mpsc::Sender<WorkItem>,
@@ -65,6 +68,8 @@ impl App {
             pending_seek_position: None,
             poll_instant: Instant::now(),
             last_track_id: None,
+            last_album_key: None,
+            art_cache: Vec::new(),
             poll_pending: false,
             next_poll: Instant::now(),
             work_tx,
@@ -123,8 +128,18 @@ impl App {
                 if track_changed {
                     self.pending_seek_position = None;
                     self.last_track_id = Some(track.id);
-                    self.cover_texture = None;
-                    let _ = self.work_tx.send(WorkItem::ExtractArtwork);
+
+                    let album_key = track.album_key();
+                    let album_changed = self.last_album_key.as_deref() != Some(&album_key);
+                    if album_changed {
+                        self.last_album_key = Some(album_key.clone());
+                        if let Some(cached) = self.art_cache_get(&album_key) {
+                            self.cover_texture = Some(cached);
+                        } else {
+                            self.cover_texture = None;
+                            let _ = self.work_tx.send(WorkItem::ExtractArtwork);
+                        }
+                    }
                 } else if let Some(pending) = self.pending_seek_position
                     && (track.position - pending).abs() < SEEK_CONFIRM_TOLERANCE
                 {
@@ -137,6 +152,7 @@ impl App {
                 self.track = None;
                 self.cover_texture = None;
                 self.last_track_id = None;
+                self.last_album_key = None;
                 self.last_error = None;
                 self.pending_seek_position = None;
             }
@@ -144,6 +160,7 @@ impl App {
                 self.track = None;
                 self.cover_texture = None;
                 self.last_track_id = None;
+                self.last_album_key = None;
                 self.last_error = Some(format!("{err:#}"));
                 self.pending_seek_position = None;
             }
@@ -153,7 +170,12 @@ impl App {
     fn apply_artwork_result(&mut self, result: Result<Option<PathBuf>>, ctx: &egui::Context) {
         match result {
             Ok(Some(path)) => match texture::load_from_file(ctx, &path) {
-                Ok(tex) => self.cover_texture = Some(tex),
+                Ok(tex) => {
+                    self.cover_texture = Some(tex.clone());
+                    if let Some(key) = &self.last_album_key {
+                        self.art_cache_insert(key.clone(), tex);
+                    }
+                }
                 Err(err) => {
                     self.last_error = Some(format!("Failed to load artwork: {err:#}"));
                 }
@@ -164,6 +186,22 @@ impl App {
             Err(err) => {
                 self.last_error = Some(format!("Artwork extraction failed: {err:#}"));
             }
+        }
+    }
+
+    fn art_cache_get(&mut self, key: &str) -> Option<TextureHandle> {
+        let idx = self.art_cache.iter().position(|(k, _)| k == key)?;
+        let entry = self.art_cache.remove(idx);
+        let tex = entry.1.clone();
+        self.art_cache.push(entry);
+        Some(tex)
+    }
+
+    fn art_cache_insert(&mut self, key: String, tex: TextureHandle) {
+        self.art_cache.retain(|(k, _)| k != &key);
+        self.art_cache.push((key, tex));
+        if self.art_cache.len() > ART_CACHE_CAP {
+            drop(self.art_cache.remove(0));
         }
     }
 

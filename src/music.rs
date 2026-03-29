@@ -29,9 +29,17 @@ pub struct TrackInfo {
     pub state: PlayerState,
     pub title: String,
     pub artist: String,
+    pub album: String,
+    pub album_artist: String,
     pub id: i64,
     pub position: f64,
     pub duration: f64,
+}
+
+impl TrackInfo {
+    pub fn album_key(&self) -> String {
+        format!("{}\0{}", self.album_artist, self.album)
+    }
 }
 
 pub fn query() -> Result<Option<TrackInfo>> {
@@ -51,12 +59,14 @@ tell application "Music"
     set trackState to (player state as text)
     set trackTitle to (name of t as text)
     set trackArtist to (artist of t as text)
+    set trackAlbum to (album of t as text)
+    set trackAlbumArtist to (album artist of t as text)
     set trackId to (id of t as text)
     set trackPos to (player position as text)
     set trackDur to (duration of t as text)
 
     set AppleScript's text item delimiters to sep
-    return {trackState, trackTitle, trackArtist, trackId, trackPos, trackDur} as text
+    return {trackState, trackTitle, trackArtist, trackAlbum, trackAlbumArtist, trackId, trackPos, trackDur} as text
 end tell
 "#;
 
@@ -78,27 +88,29 @@ end tell
     }
 
     let parts: Vec<&str> = stdout.split(FIELD_SEP).collect();
-    if parts.len() != 6 {
+    if parts.len() != 8 {
         return Err(anyhow!("Unexpected AppleScript output: {:?}", stdout));
     }
 
-    let id: i64 = parts[3]
+    let id: i64 = parts[5]
         .trim()
         .parse()
-        .with_context(|| format!("Failed to parse track id: {:?}", parts[3]))?;
-    let position: f64 = parts[4]
+        .with_context(|| format!("Failed to parse track id: {:?}", parts[5]))?;
+    let position: f64 = parts[6]
         .trim()
         .parse()
-        .with_context(|| format!("Failed to parse position: {:?}", parts[4]))?;
-    let duration: f64 = parts[5]
+        .with_context(|| format!("Failed to parse position: {:?}", parts[6]))?;
+    let duration: f64 = parts[7]
         .trim()
         .parse()
-        .with_context(|| format!("Failed to parse duration: {:?}", parts[5]))?;
+        .with_context(|| format!("Failed to parse duration: {:?}", parts[7]))?;
 
     Ok(Some(TrackInfo {
         state: PlayerState::parse(parts[0].trim())?,
         title: parts[1].trim().to_string(),
         artist: parts[2].trim().to_string(),
+        album: parts[3].trim().to_string(),
+        album_artist: parts[4].trim().to_string(),
         id,
         position,
         duration,

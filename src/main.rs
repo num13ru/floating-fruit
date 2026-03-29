@@ -10,7 +10,7 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Apple Music Now Playing")
-            .with_inner_size([340.0, 120.0])
+            .with_inner_size([340.0, 150.0])
             .with_resizable(false)
             .with_decorations(false)
             .with_always_on_top(),

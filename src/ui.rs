@@ -82,6 +82,12 @@ impl eframe::App for App {
                             .size(14.0)
                             .color(egui::Color32::from_gray(190)),
                     );
+                    ui.add_space(2.0);
+                    ui.label(
+                        RichText::new(&track.album)
+                            .size(12.0)
+                            .color(egui::Color32::from_gray(150)),
+                    );
                     ui.add_space(4.0);
 
                     let play_pause_label = match track.state {
