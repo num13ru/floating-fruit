@@ -141,9 +141,7 @@ impl eframe::App for App {
         {
             let full_rect = ui.max_rect();
             let duration = track.duration;
-            let base_position = self
-                .pending_seek_position
-                .unwrap_or(track.position);
+            let base_position = self.effective_position();
 
             let bar_top = full_rect.bottom() - PROGRESS_HEIGHT;
             let bar_rect = egui::Rect::from_min_size(
