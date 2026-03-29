@@ -220,6 +220,12 @@ impl App {
         }
     }
 
+    pub(crate) fn reveal_in_app(&self) {
+        thread::spawn(|| {
+            let _ = music::reveal_current_track();
+        });
+    }
+
     pub(crate) fn execute_command(&mut self, cmd: music::PlayerCommand) {
         thread::spawn(move || {
             let _ = music::send_command(cmd);

@@ -52,21 +52,37 @@ impl eframe::App for App {
         let mut pending_command: Option<PlayerCommand> = None;
 
         ui.horizontal(|ui| {
+            let cover_size = egui::vec2(COVER_SIZE, COVER_SIZE);
+            let has_track = self.track.is_some();
+            let sense = if has_track { egui::Sense::click() } else { egui::Sense::hover() };
+            let (cover_rect, cover_response) = ui.allocate_exact_size(cover_size, sense);
+
             if let Some(texture) = &self.cover_texture {
-                let size = egui::vec2(COVER_SIZE, COVER_SIZE);
-                ui.add(egui::Image::new(texture).fit_to_exact_size(size));
+                let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+                ui.painter().image(texture.id(), cover_rect, uv, egui::Color32::WHITE);
             } else {
-                let size = egui::vec2(COVER_SIZE, COVER_SIZE);
-                let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
                 ui.painter()
-                    .rect_filled(rect, COVER_ROUNDING, PLACEHOLDER_COLOR);
+                    .rect_filled(cover_rect, COVER_ROUNDING, PLACEHOLDER_COLOR);
                 ui.painter().text(
-                    rect.center(),
+                    cover_rect.center(),
                     egui::Align2::CENTER_CENTER,
                     "♪",
                     egui::FontId::proportional(28.0),
                     egui::Color32::LIGHT_GRAY,
                 );
+            }
+
+            if has_track && cover_response.hovered() {
+                let alpha = if cover_response.is_pointer_button_down_on() { 25 } else { 12 };
+                ui.painter().rect_filled(
+                    cover_rect,
+                    COVER_ROUNDING,
+                    egui::Color32::from_white_alpha(alpha),
+                );
+            }
+
+            if cover_response.clicked() && has_track {
+                self.reveal_in_app();
             }
 
             ui.add_space(8.0);

@@ -213,6 +213,28 @@ pub fn send_command(cmd: PlayerCommand) -> Result<()> {
     Ok(())
 }
 
+pub fn reveal_current_track() -> Result<()> {
+    let script = r#"
+tell application "Music"
+    activate
+    reveal current track
+end tell
+"#;
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .context("Failed to run osascript")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("osascript failed: {}", stderr.trim()));
+    }
+
+    Ok(())
+}
+
 fn escape_applescript_string(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
