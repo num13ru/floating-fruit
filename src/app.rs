@@ -73,4 +73,11 @@ impl App {
 
         ctx.request_repaint_after(POLL_EVERY);
     }
+
+    pub(crate) fn execute_command(&mut self, cmd: music::PlayerCommand) {
+        if let Err(err) = music::send_command(cmd) {
+            self.last_error = Some(format!("{err:#}"));
+        }
+        self.last_poll = Instant::now() - POLL_EVERY;
+    }
 }

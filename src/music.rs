@@ -137,6 +137,33 @@ end tell
     }))
 }
 
+pub enum PlayerCommand {
+    Previous,
+    PlayPause,
+    Next,
+}
+
+pub fn send_command(cmd: PlayerCommand) -> Result<()> {
+    let script = match cmd {
+        PlayerCommand::Previous => r#"tell application "Music" to previous track"#,
+        PlayerCommand::PlayPause => r#"tell application "Music" to playpause"#,
+        PlayerCommand::Next => r#"tell application "Music" to next track"#,
+    };
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .context("Failed to run osascript")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("osascript failed: {}", stderr.trim()));
+    }
+
+    Ok(())
+}
+
 fn escape_applescript_string(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
