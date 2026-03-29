@@ -7,3 +7,9 @@ edition = "2024"
 anyhow = "1"
 eframe = "0.34.1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+[package.metadata.bundle]
+name = "Floating Fruit"
+identifier = "com.floating-fruit.app"
+icon = ["assets/icon.icns"]
+category = "Music"
