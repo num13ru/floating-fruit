@@ -15,9 +15,13 @@ const CONTROL_FONT_SIZE: f32 = 16.0;
 const CONTROL_PADDING: egui::Vec2 = egui::vec2(10.0, 6.0);
 const CONTROL_ROUNDING: f32 = 4.0;
 const PROGRESS_HEIGHT: f32 = 20.0;
-const PROGRESS_MARGIN_TOP: f32 = 4.0;
 const PROGRESS_TRACK_COLOR: egui::Color32 = egui::Color32::from_gray(40);
 const PROGRESS_FILL_COLOR: egui::Color32 = egui::Color32::from_gray(120);
+const PROGRESS_FILL_HOVER_COLOR: egui::Color32 = egui::Color32::from_gray(160);
+const PROGRESS_FILL_PRESSED_COLOR: egui::Color32 = egui::Color32::from_gray(100);
+const SHIMMER_WIDTH: f32 = 40.0;
+const SHIMMER_PERIOD: f64 = 1.0;
+const SHIMMER_ALPHA: u8 = 30;
 const TIME_FONT_SIZE: f32 = 14.0;
 const TIME_COLOR: egui::Color32 = egui::Color32::from_gray(140);
 const TIME_MARGIN_BOTTOM: f32 = 2.0;
@@ -136,30 +140,91 @@ impl eframe::App for App {
             && track.duration > 0.0
         {
             let full_rect = ui.max_rect();
-            let fraction = (track.position / track.duration).clamp(0.0, 1.0) as f32;
+            let duration = track.duration;
+            let base_position = self
+                .pending_seek_position
+                .unwrap_or(track.position);
 
-            let bar_top = full_rect.bottom() - PROGRESS_HEIGHT - PROGRESS_MARGIN_TOP;
-            let track_rect = egui::Rect::from_min_size(
+            let bar_top = full_rect.bottom() - PROGRESS_HEIGHT;
+            let bar_rect = egui::Rect::from_min_size(
                 egui::pos2(full_rect.left(), bar_top),
                 egui::vec2(full_rect.width(), PROGRESS_HEIGHT),
             );
-            ui.painter().rect_filled(track_rect, 0.0, PROGRESS_TRACK_COLOR);
 
-            let fill_rect = egui::Rect::from_min_size(
-                track_rect.min,
-                egui::vec2(track_rect.width() * fraction, PROGRESS_HEIGHT),
+            let bar_response = ui.interact(
+                bar_rect,
+                ui.id().with("seekbar"),
+                egui::Sense::click_and_drag(),
             );
-            ui.painter().rect_filled(fill_rect, 0.0, PROGRESS_FILL_COLOR);
 
-            let time_text: String = format!(
+            let pointer_fraction = bar_response
+                .interact_pointer_pos()
+                .map(|pos| ((pos.x - bar_rect.left()) / bar_rect.width()).clamp(0.0, 1.0));
+
+            let is_interacting =
+                bar_response.is_pointer_button_down_on() || bar_response.dragged();
+            let display_position = if is_interacting {
+                pointer_fraction.map_or(base_position, |f| f as f64 * duration)
+            } else {
+                base_position
+            };
+            let fraction = (display_position / duration).clamp(0.0, 1.0) as f32;
+
+            if (bar_response.clicked() || bar_response.drag_stopped())
+                && let Some(f) = pointer_fraction
+            {
+                self.seek(f as f64 * duration);
+            }
+
+            let fill_color = if bar_response.is_pointer_button_down_on() {
+                PROGRESS_FILL_PRESSED_COLOR
+            } else if bar_response.hovered() {
+                PROGRESS_FILL_HOVER_COLOR
+            } else {
+                PROGRESS_FILL_COLOR
+            };
+
+            ui.painter()
+                .rect_filled(bar_rect, 0.0, PROGRESS_TRACK_COLOR);
+
+            let fill_width = bar_rect.width() * fraction;
+            let fill_rect = egui::Rect::from_min_size(
+                bar_rect.min,
+                egui::vec2(fill_width, PROGRESS_HEIGHT),
+            );
+            ui.painter().rect_filled(fill_rect, 0.0, fill_color);
+
+            if self.pending_seek_position.is_some() && fill_width > 0.0 {
+                let time = ui.ctx().input(|i| i.time);
+                let phase = ((time % SHIMMER_PERIOD) / SHIMMER_PERIOD) as f32;
+                let shimmer_center = fill_rect.left() + phase * fill_width;
+                let shimmer_left = (shimmer_center - SHIMMER_WIDTH / 2.0).max(fill_rect.left());
+                let shimmer_right = (shimmer_center + SHIMMER_WIDTH / 2.0).min(fill_rect.right());
+
+                if shimmer_right > shimmer_left {
+                    let shimmer_rect = egui::Rect::from_x_y_ranges(
+                        shimmer_left..=shimmer_right,
+                        fill_rect.y_range(),
+                    );
+                    ui.painter().rect_filled(
+                        shimmer_rect,
+                        0.0,
+                        egui::Color32::from_white_alpha(SHIMMER_ALPHA),
+                    );
+                }
+
+                ui.ctx().request_repaint();
+            }
+
+            let time_text = format!(
                 "{} / {}",
-                format_time(track.position),
-                format_time(track.duration),
+                format_time(display_position),
+                format_time(duration),
             );
             let font = egui::FontId::proportional(TIME_FONT_SIZE);
-            let galley =
-                ui.painter()
-                    .layout_no_wrap(time_text, font, TIME_COLOR);
+            let galley = ui
+                .painter()
+                .layout_no_wrap(time_text, font, TIME_COLOR);
             let text_pos = egui::pos2(
                 full_rect.left() + TIME_MARGIN_X,
                 bar_top - galley.size().y - TIME_MARGIN_BOTTOM,

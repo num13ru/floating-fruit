@@ -157,13 +157,21 @@ pub enum PlayerCommand {
     Previous,
     PlayPause,
     Next,
+    Seek(f64),
 }
 
 pub fn send_command(cmd: PlayerCommand) -> Result<()> {
+    let owned;
     let script = match cmd {
         PlayerCommand::Previous => r#"tell application "Music" to previous track"#,
         PlayerCommand::PlayPause => r#"tell application "Music" to playpause"#,
         PlayerCommand::Next => r#"tell application "Music" to next track"#,
+        PlayerCommand::Seek(pos) => {
+            owned = format!(
+                r#"tell application "Music" to set player position to {pos}"#
+            );
+            &owned
+        }
     };
 
     let output = Command::new("osascript")

@@ -21,6 +21,7 @@ pub struct App {
     pub(crate) cover_texture: Option<TextureHandle>,
     pub(crate) last_loaded_art_path: Option<PathBuf>,
     pub(crate) last_error: Option<String>,
+    pub(crate) pending_seek_position: Option<f64>,
     next_poll: Instant,
     poll_rx: Option<mpsc::Receiver<PollResult>>,
 }
@@ -32,6 +33,7 @@ impl App {
             cover_texture: None,
             last_loaded_art_path: None,
             last_error: None,
+            pending_seek_position: None,
             next_poll: Instant::now(),
             poll_rx: None,
         }
@@ -71,6 +73,8 @@ impl App {
     }
 
     fn apply_poll_result(&mut self, result: PollResult, ctx: &egui::Context) {
+        self.pending_seek_position = None;
+
         match result {
             Ok(Some(track)) => {
                 let art_changed = track.artwork_path != self.last_loaded_art_path;
@@ -114,5 +118,10 @@ impl App {
         });
         self.poll_rx = None;
         self.next_poll = Instant::now() + COMMAND_SETTLE;
+    }
+
+    pub(crate) fn seek(&mut self, position: f64) {
+        self.pending_seek_position = Some(position);
+        self.execute_command(music::PlayerCommand::Seek(position));
     }
 }
