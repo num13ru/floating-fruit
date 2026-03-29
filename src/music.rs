@@ -41,6 +41,8 @@ pub struct TrackInfo {
     pub title: String,
     pub artist: String,
     pub artwork_path: Option<PathBuf>,
+    pub position: f64,
+    pub duration: f64,
 }
 
 pub fn query() -> Result<Option<TrackInfo>> {
@@ -94,8 +96,11 @@ tell application "Music"
         set artPath to ""
     end try
 
+    set trackPos to (player position as text)
+    set trackDur to (duration of t as text)
+
     set AppleScript's text item delimiters to sep
-    return {{trackState, trackTitle, trackArtist, artPath}} as text
+    return {{trackState, trackTitle, trackArtist, artPath, trackPos, trackDur}} as text
 end tell
 "#,
         output_base = escape_applescript_string(base_path_str),
@@ -119,7 +124,7 @@ end tell
     }
 
     let parts: Vec<&str> = stdout.split(FIELD_SEP).collect();
-    if parts.len() != 4 {
+    if parts.len() != 6 {
         return Err(anyhow!("Unexpected AppleScript output: {:?}", stdout));
     }
 
@@ -129,11 +134,22 @@ end tell
         Some(PathBuf::from(parts[3].trim()))
     };
 
+    let position: f64 = parts[4]
+        .trim()
+        .parse()
+        .with_context(|| format!("Failed to parse position: {:?}", parts[4]))?;
+    let duration: f64 = parts[5]
+        .trim()
+        .parse()
+        .with_context(|| format!("Failed to parse duration: {:?}", parts[5]))?;
+
     Ok(Some(TrackInfo {
         state: PlayerState::parse(parts[0].trim())?,
         title: parts[1].trim().to_string(),
         artist: parts[2].trim().to_string(),
         artwork_path,
+        position,
+        duration,
     }))
 }
 

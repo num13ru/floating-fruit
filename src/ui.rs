@@ -14,6 +14,14 @@ const CONTROL_PRESSED_COLOR: egui::Color32 = egui::Color32::from_gray(140);
 const CONTROL_FONT_SIZE: f32 = 16.0;
 const CONTROL_PADDING: egui::Vec2 = egui::vec2(10.0, 6.0);
 const CONTROL_ROUNDING: f32 = 4.0;
+const PROGRESS_HEIGHT: f32 = 20.0;
+const PROGRESS_MARGIN_TOP: f32 = 4.0;
+const PROGRESS_TRACK_COLOR: egui::Color32 = egui::Color32::from_gray(40);
+const PROGRESS_FILL_COLOR: egui::Color32 = egui::Color32::from_gray(120);
+const TIME_FONT_SIZE: f32 = 14.0;
+const TIME_COLOR: egui::Color32 = egui::Color32::from_gray(140);
+const TIME_MARGIN_BOTTOM: f32 = 2.0;
+const TIME_MARGIN_X: f32 = 4.0;
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -123,6 +131,41 @@ impl eframe::App for App {
         if let Some(cmd) = pending_command {
             self.execute_command(cmd);
         }
+
+        if let Some(track) = &self.track
+            && track.duration > 0.0
+        {
+            let full_rect = ui.max_rect();
+            let fraction = (track.position / track.duration).clamp(0.0, 1.0) as f32;
+
+            let bar_top = full_rect.bottom() - PROGRESS_HEIGHT - PROGRESS_MARGIN_TOP;
+            let track_rect = egui::Rect::from_min_size(
+                egui::pos2(full_rect.left(), bar_top),
+                egui::vec2(full_rect.width(), PROGRESS_HEIGHT),
+            );
+            ui.painter().rect_filled(track_rect, 0.0, PROGRESS_TRACK_COLOR);
+
+            let fill_rect = egui::Rect::from_min_size(
+                track_rect.min,
+                egui::vec2(track_rect.width() * fraction, PROGRESS_HEIGHT),
+            );
+            ui.painter().rect_filled(fill_rect, 0.0, PROGRESS_FILL_COLOR);
+
+            let time_text: String = format!(
+                "{} / {}",
+                format_time(track.position),
+                format_time(track.duration),
+            );
+            let font = egui::FontId::proportional(TIME_FONT_SIZE);
+            let galley =
+                ui.painter()
+                    .layout_no_wrap(time_text, font, TIME_COLOR);
+            let text_pos = egui::pos2(
+                full_rect.left() + TIME_MARGIN_X,
+                bar_top - galley.size().y - TIME_MARGIN_BOTTOM,
+            );
+            ui.painter().galley(text_pos, galley, TIME_COLOR);
+        }
     }
 }
 
@@ -162,4 +205,11 @@ fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     }
 
     response
+}
+
+fn format_time(seconds: f64) -> String {
+    let total = seconds.max(0.0) as u64;
+    let m = total / 60;
+    let s = total % 60;
+    format!("{m}:{s:02}")
 }
