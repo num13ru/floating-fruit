@@ -11,7 +11,7 @@ use eframe::egui;
 const APP_NAME: &str = "Floating Fruit — Apple Music Widget";
 
 fn main() -> eframe::Result<()> {
-    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png"))
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/app-icon.png"))
         .expect("Failed to load app icon");
 
     let options = eframe::NativeOptions {

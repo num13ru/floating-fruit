@@ -8,6 +8,11 @@ anyhow = "1"
 eframe = "0.34.1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+
 [package.metadata.bundle]
 name = "Floating Fruit"
 identifier = "com.floating-fruit.app"
