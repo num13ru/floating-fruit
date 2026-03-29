@@ -128,8 +128,10 @@ impl eframe::App for App {
 
 fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     let font = egui::FontId::proportional(CONTROL_FONT_SIZE);
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font.clone(), CONTROL_COLOR);
-    let desired_size = galley.size() + CONTROL_PADDING * 2.0;
+    let base_galley =
+        ui.painter()
+            .layout_no_wrap(label.to_string(), font.clone(), CONTROL_COLOR);
+    let desired_size = base_galley.size() + CONTROL_PADDING * 2.0;
 
     let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
@@ -148,7 +150,13 @@ fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
                 .rect_filled(rect, CONTROL_ROUNDING, egui::Color32::from_white_alpha(bg_alpha));
         }
 
-        let galley = ui.painter().layout_no_wrap(label.to_string(), font, text_color);
+        let galley = if text_color == CONTROL_COLOR {
+            base_galley
+        } else {
+            ui.painter()
+                .layout_no_wrap(label.to_string(), font, text_color)
+        };
+
         let text_pos = rect.center() - galley.size() / 2.0;
         ui.painter().galley(text_pos, galley, text_color);
     }

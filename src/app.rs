@@ -1,52 +1,86 @@
 use std::{
     path::PathBuf,
+    sync::mpsc,
+    thread,
     time::{Duration, Instant},
 };
 
+use anyhow::Result;
 use eframe::egui::{self, TextureHandle};
 
 use crate::{music, texture};
 
 pub(crate) const POLL_EVERY: Duration = Duration::from_secs(1);
+const POLL_CHECK: Duration = Duration::from_millis(50);
+const COMMAND_SETTLE: Duration = Duration::from_millis(200);
+
+type PollResult = Result<Option<music::TrackInfo>>;
 
 pub struct App {
-    pub(crate) last_poll: Instant,
     pub(crate) track: Option<music::TrackInfo>,
     pub(crate) cover_texture: Option<TextureHandle>,
     pub(crate) last_loaded_art_path: Option<PathBuf>,
     pub(crate) last_error: Option<String>,
+    next_poll: Instant,
+    poll_rx: Option<mpsc::Receiver<PollResult>>,
 }
 
 impl App {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
-            last_poll: Instant::now() - POLL_EVERY,
             track: None,
             cover_texture: None,
             last_loaded_art_path: None,
             last_error: None,
+            next_poll: Instant::now(),
+            poll_rx: None,
         }
     }
 
     pub(crate) fn poll_if_needed(&mut self, ctx: &egui::Context) {
-        if self.last_poll.elapsed() < POLL_EVERY {
-            ctx.request_repaint_after(POLL_EVERY - self.last_poll.elapsed());
-            return;
+        if let Some(rx) = &self.poll_rx {
+            match rx.try_recv() {
+                Ok(result) => {
+                    self.poll_rx = None;
+                    self.apply_poll_result(result, ctx);
+                    self.next_poll = Instant::now() + POLL_EVERY;
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    ctx.request_repaint_after(POLL_CHECK);
+                    return;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    self.poll_rx = None;
+                    self.next_poll = Instant::now() + POLL_EVERY;
+                }
+            }
         }
 
-        self.last_poll = Instant::now();
+        if self.poll_rx.is_none() && Instant::now() >= self.next_poll {
+            let (tx, rx) = mpsc::channel();
+            thread::spawn(move || {
+                let _ = tx.send(music::query());
+            });
+            self.poll_rx = Some(rx);
+            ctx.request_repaint_after(POLL_CHECK);
+        } else if self.poll_rx.is_none() {
+            ctx.request_repaint_after(
+                self.next_poll.saturating_duration_since(Instant::now()),
+            );
+        }
+    }
 
-        match music::query() {
+    fn apply_poll_result(&mut self, result: PollResult, ctx: &egui::Context) {
+        match result {
             Ok(Some(track)) => {
                 let art_changed = track.artwork_path != self.last_loaded_art_path;
-                self.track = Some(track.clone());
                 self.last_error = None;
 
                 if art_changed {
                     self.cover_texture = None;
                     self.last_loaded_art_path = track.artwork_path.clone();
 
-                    if let Some(path) = &track.artwork_path {
+                    if let Some(path) = &self.last_loaded_art_path {
                         match texture::load_from_file(ctx, path) {
                             Ok(tex) => self.cover_texture = Some(tex),
                             Err(err) => {
@@ -56,6 +90,8 @@ impl App {
                         }
                     }
                 }
+
+                self.track = Some(track);
             }
             Ok(None) => {
                 self.track = None;
@@ -70,14 +106,13 @@ impl App {
                 self.last_error = Some(format!("{err:#}"));
             }
         }
-
-        ctx.request_repaint_after(POLL_EVERY);
     }
 
     pub(crate) fn execute_command(&mut self, cmd: music::PlayerCommand) {
-        if let Err(err) = music::send_command(cmd) {
-            self.last_error = Some(format!("{err:#}"));
-        }
-        self.last_poll = Instant::now() - POLL_EVERY;
+        thread::spawn(move || {
+            let _ = music::send_command(cmd);
+        });
+        self.poll_rx = None;
+        self.next_poll = Instant::now() + COMMAND_SETTLE;
     }
 }
