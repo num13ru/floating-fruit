@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use eframe::egui::{self, RichText};
 
 use crate::app::App;
@@ -26,6 +28,9 @@ const TIME_FONT_SIZE: f32 = 14.0;
 const TIME_COLOR: egui::Color32 = egui::Color32::from_gray(140);
 const TIME_MARGIN_BOTTOM: f32 = 2.0;
 const TIME_MARGIN_X: f32 = 4.0;
+const SCROLL_SPEED: f32 = 30.0;
+const SCROLL_PAUSE: f64 = 4.0;
+const SCROLL_REPAINT: Duration = Duration::from_millis(50);
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -70,23 +75,25 @@ impl eframe::App for App {
                 ui.add_space(8.0);
 
                 if let Some(track) = &self.track {
-                    ui.label(
-                        RichText::new(&track.title)
-                            .strong()
-                            .size(18.0)
-                            .color(egui::Color32::WHITE),
+                    scrolling_label(
+                        ui,
+                        &track.title,
+                        egui::FontId::proportional(18.0),
+                        egui::Color32::WHITE,
                     );
                     ui.add_space(4.0);
-                    ui.label(
-                        RichText::new(&track.artist)
-                            .size(14.0)
-                            .color(egui::Color32::from_gray(190)),
+                    scrolling_label(
+                        ui,
+                        &track.artist,
+                        egui::FontId::proportional(14.0),
+                        egui::Color32::from_gray(190),
                     );
                     ui.add_space(2.0);
-                    ui.label(
-                        RichText::new(&track.album)
-                            .size(12.0)
-                            .color(egui::Color32::from_gray(150)),
+                    scrolling_label(
+                        ui,
+                        &track.album,
+                        egui::FontId::proportional(12.0),
+                        egui::Color32::from_gray(150),
                     );
                     ui.add_space(4.0);
 
@@ -274,6 +281,48 @@ fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     }
 
     response
+}
+
+fn scrolling_label(ui: &mut egui::Ui, text: &str, font: egui::FontId, color: egui::Color32) {
+    let max_width = ui.available_width();
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.to_string(), font, color);
+    let text_width = galley.size().x;
+
+    if text_width <= max_width {
+        let (rect, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
+        ui.painter().galley(rect.min, galley, color);
+        return;
+    }
+
+    let overflow = text_width - max_width;
+    let offset = ping_pong_offset(ui.ctx().input(|i| i.time), overflow);
+
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(max_width, galley.size().y), egui::Sense::hover());
+    let text_pos = egui::pos2(rect.left() - offset, rect.top());
+    ui.painter()
+        .with_clip_rect(rect)
+        .galley(text_pos, galley, color);
+    ui.ctx().request_repaint_after(SCROLL_REPAINT);
+}
+
+fn ping_pong_offset(time: f64, overflow: f32) -> f32 {
+    let scroll_dur = overflow as f64 / SCROLL_SPEED as f64;
+    let cycle = SCROLL_PAUSE + scroll_dur + SCROLL_PAUSE + scroll_dur;
+    let t = time % cycle;
+
+    if t < SCROLL_PAUSE {
+        0.0
+    } else if t < SCROLL_PAUSE + scroll_dur {
+        ((t - SCROLL_PAUSE) / scroll_dur) as f32 * overflow
+    } else if t < 2.0 * SCROLL_PAUSE + scroll_dur {
+        overflow
+    } else {
+        let back = t - 2.0 * SCROLL_PAUSE - scroll_dur;
+        (1.0 - (back / scroll_dur) as f32) * overflow
+    }
 }
 
 fn format_time(seconds: f64) -> String {
