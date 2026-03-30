@@ -42,10 +42,11 @@ pub struct App {
     next_poll: Instant,
     work_tx: mpsc::Sender<WorkItem>,
     result_rx: mpsc::Receiver<WorkResult>,
+    last_pixels_per_point: f32,
 }
 
 impl App {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let (work_tx, work_rx) = mpsc::channel::<WorkItem>();
         let (result_tx, result_rx) = mpsc::channel::<WorkResult>();
 
@@ -74,10 +75,17 @@ impl App {
             next_poll: Instant::now(),
             work_tx,
             result_rx,
+            last_pixels_per_point: cc.egui_ctx.pixels_per_point(),
         }
     }
 
     pub(crate) fn poll_if_needed(&mut self, ctx: &egui::Context) {
+        let ppp = ctx.pixels_per_point();
+        if (ppp - self.last_pixels_per_point).abs() > 0.01 {
+            self.last_pixels_per_point = ppp;
+            ctx.set_fonts(egui::FontDefinitions::default());
+        }
+
         let mut latest_query: Option<PollResult> = None;
         while let Ok(result) = self.result_rx.try_recv() {
             match result {
