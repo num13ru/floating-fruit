@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::Command};
+use std::{fmt, path::PathBuf, process::Command};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -39,6 +39,29 @@ pub struct TrackInfo {
 impl TrackInfo {
     pub fn album_key(&self) -> String {
         format!("{}\0{}", self.album_artist, self.album)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtworkRequest {
+    pub track_id: i64,
+    pub album_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArtworkExtraction {
+    Path(PathBuf),
+    Missing,
+    Stale,
+}
+
+impl ArtworkExtraction {
+    fn parse(stdout: &str) -> Self {
+        match stdout {
+            "" => Self::Missing,
+            "__STALE__" => Self::Stale,
+            path => Self::Path(PathBuf::from(path)),
+        }
     }
 }
 
@@ -117,16 +140,22 @@ end tell
     }))
 }
 
-pub fn extract_artwork() -> Result<Option<PathBuf>> {
-    let base_path = std::env::temp_dir().join("am_now_playing_artwork");
+pub fn extract_artwork(request: &ArtworkRequest) -> Result<ArtworkExtraction> {
+    let base_path =
+        std::env::temp_dir().join(format!("am_now_playing_artwork_{}", request.track_id));
     let base_path_str = base_path
         .to_str()
         .ok_or_else(|| anyhow!("Temp path is not valid UTF-8"))?;
+    let expected_track_id = AppleScriptNumber(request.track_id);
 
     let script = format!(
         r#"
 tell application "Music"
     set t to current track
+    if (id of t as text) is not "{expected_track_id}" then
+        return "__STALE__"
+    end if
+
     set outputBase to "{output_base}"
     set artPath to ""
 
@@ -158,6 +187,7 @@ tell application "Music"
     return artPath
 end tell
 "#,
+        expected_track_id = expected_track_id,
         output_base = escape_applescript_string(base_path_str),
     );
 
@@ -174,11 +204,7 @@ end tell
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    if stdout.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(PathBuf::from(stdout)))
-    }
+    Ok(ArtworkExtraction::parse(&stdout))
 }
 
 pub enum PlayerCommand {
@@ -237,4 +263,42 @@ end tell
 
 fn escape_applescript_string(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+struct AppleScriptNumber(i64);
+
+impl fmt::Display for AppleScriptNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ArtworkExtraction, PlayerState, TrackInfo};
+
+    #[test]
+    fn artwork_extraction_parse_distinguishes_stale_from_missing() {
+        assert_eq!(ArtworkExtraction::parse(""), ArtworkExtraction::Missing);
+        assert_eq!(
+            ArtworkExtraction::parse("__STALE__"),
+            ArtworkExtraction::Stale
+        );
+    }
+
+    #[test]
+    fn album_key_uses_album_artist_and_album() {
+        let track = TrackInfo {
+            state: PlayerState::Playing,
+            title: "Title".into(),
+            artist: "Artist".into(),
+            album: "Album".into(),
+            album_artist: "Album Artist".into(),
+            id: 1,
+            position: 0.0,
+            duration: 10.0,
+        };
+
+        assert_eq!(track.album_key(), "Album Artist\0Album");
+    }
 }
