@@ -20,14 +20,11 @@ fn main() -> eframe::Result<()> {
             .with_inner_size([340.0, 150.0])
             .with_resizable(false)
             .with_decorations(false)
+            .with_transparent(true)
             .with_always_on_top()
             .with_icon(Arc::new(icon)),
         ..Default::default()
     };
 
-    eframe::run_native(
-        APP_NAME,
-        options,
-        Box::new(|cc| Ok(Box::new(App::new(cc)))),
-    )
+    eframe::run_native(APP_NAME, options, Box::new(|cc| Ok(Box::new(App::new(cc)))))
 }
