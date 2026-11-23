@@ -1,4 +1,5 @@
 mod app;
+mod fonts;
 mod music;
 mod texture;
 mod ui;
@@ -28,6 +29,9 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         APP_NAME,
         options,
-        Box::new(|cc| Ok(Box::new(App::new(cc)))),
+        Box::new(|cc| {
+            cc.egui_ctx.set_fonts(fonts::font_definitions());
+            Ok(Box::new(App::new(cc)))
+        }),
     )
 }

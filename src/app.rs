@@ -105,7 +105,7 @@ impl App {
         let ppp = ctx.pixels_per_point();
         if (ppp - self.last_pixels_per_point).abs() > 0.01 {
             self.last_pixels_per_point = ppp;
-            ctx.set_fonts(egui::FontDefinitions::default());
+            ctx.set_fonts(crate::fonts::font_definitions());
         }
 
         let mut latest_query: Option<(u64, PollResult)> = None;
