@@ -20,7 +20,7 @@ const PROGRESS_HEIGHT: f32 = 20.0;
 const PROGRESS_TRACK_COLOR: egui::Color32 = egui::Color32::from_gray(40);
 const PROGRESS_FILL_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 205, 215);
 const PROGRESS_FILL_PRESSED_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 140, 40);
-const PROGRESS_FILL_SEEK_COLOR: egui::Color32 = egui::Color32::from_rgb(220, 60, 60);
+const PROGRESS_FILL_SEEK_COLOR: egui::Color32 = egui::Color32::from_rgb(150, 35, 35);
 const PROGRESS_FILL_HOVER_INTENSITY: f32 = 1.35;
 const PROGRESS_FILL_SPEED: f32 = 1.0;
 const PROGRESS_FILL_SEEK_SPEED: f32 = 2.5;
@@ -244,7 +244,7 @@ impl eframe::App for App {
                     PROGRESS_FILL_COLOR
                 };
                 let intensity = if seeking {
-                    1.3
+                    0.85
                 } else if hovered {
                     PROGRESS_FILL_HOVER_INTENSITY
                 } else {
