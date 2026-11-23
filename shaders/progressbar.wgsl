@@ -91,7 +91,7 @@ fn fs_main(input: VSOut) -> @location(0) vec4<f32> {
 
     // Domain-warped liquid lava pattern
     let t = u.time * u.speed;
-    let q = vec3<f32>(local.x * 8.0, local.y * 4.0, t * 0.6);
+    let q = vec3<f32>(pixel.x * 0.09, pixel.y * 0.18, t * 0.6);
     let warp = fbm(q + vec3<f32>(0.0, 0.0, t * 0.9));
     let lava = fbm(q + vec3<f32>(warp * 2.2, warp * 1.4, t * 0.35));
 
