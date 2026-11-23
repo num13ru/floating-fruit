@@ -25,10 +25,7 @@ const PROGRESS_FILL_HOVER_INTENSITY: f32 = 1.35;
 const PROGRESS_FILL_SPEED: f32 = 1.0;
 const PROGRESS_FILL_SEEK_SPEED: f32 = 2.5;
 /// Time constant for easing the lava fill toward its target state.
-const FILL_TRANSITION_DURATION: f32 = 0.45;
-const SHIMMER_WIDTH: f32 = 40.0;
-const SHIMMER_PERIOD: f64 = 1.0;
-const SHIMMER_ALPHA: u8 = 30;
+const FILL_TRANSITION_DURATION: f32 = 0.3;
 const TIME_FONT_SIZE: f32 = 14.0;
 const TIME_COLOR: egui::Color32 = egui::Color32::from_gray(140);
 const TIME_MARGIN_BOTTOM: f32 = 2.0;
@@ -65,12 +62,17 @@ impl eframe::App for App {
 
         ui.horizontal(|ui| {
             let cover_size = egui::vec2(COVER_SIZE, COVER_SIZE);
-            let sense = if has_track { egui::Sense::click() } else { egui::Sense::hover() };
+            let sense = if has_track {
+                egui::Sense::click()
+            } else {
+                egui::Sense::hover()
+            };
             let (cover_rect, cover_response) = ui.allocate_exact_size(cover_size, sense);
 
             if let Some(texture) = &cover_texture_snapshot {
                 let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-                ui.painter().image(texture.id(), cover_rect, uv, egui::Color32::WHITE);
+                ui.painter()
+                    .image(texture.id(), cover_rect, uv, egui::Color32::WHITE);
             } else {
                 ui.painter()
                     .rect_filled(cover_rect, COVER_ROUNDING, PLACEHOLDER_COLOR);
@@ -84,7 +86,11 @@ impl eframe::App for App {
             }
 
             if has_track && cover_response.hovered() {
-                let alpha = if cover_response.is_pointer_button_down_on() { 25 } else { 12 };
+                let alpha = if cover_response.is_pointer_button_down_on() {
+                    25
+                } else {
+                    12
+                };
                 ui.painter().rect_filled(
                     cover_rect,
                     COVER_ROUNDING,
@@ -153,11 +159,7 @@ impl eframe::App for App {
                             .color(egui::Color32::WHITE),
                     );
                     ui.add_space(4.0);
-                    ui.label(
-                        RichText::new(err)
-                            .size(12.0)
-                            .color(ERROR_TEXT_COLOR),
-                    );
+                    ui.label(RichText::new(err).size(12.0).color(ERROR_TEXT_COLOR));
                 } else {
                     ui.label(
                         RichText::new("Nothing playing")
@@ -183,10 +185,7 @@ impl eframe::App for App {
             self.execute_command(cmd);
         }
 
-        let draw_seekbar = self
-            .track
-            .as_ref()
-            .is_some_and(|t| t.duration > 0.0);
+        let draw_seekbar = self.track.as_ref().is_some_and(|t| t.duration > 0.0);
 
         if draw_seekbar {
             let duration = self.track.as_ref().unwrap().duration;
@@ -209,8 +208,7 @@ impl eframe::App for App {
                 .interact_pointer_pos()
                 .map(|pos| ((pos.x - bar_rect.left()) / bar_rect.width()).clamp(0.0, 1.0));
 
-            let is_interacting =
-                bar_response.is_pointer_button_down_on() || bar_response.dragged();
+            let is_interacting = bar_response.is_pointer_button_down_on() || bar_response.dragged();
             let display_position = if is_interacting {
                 pointer_fraction.map_or(base_position, |f| f as f64 * duration)
             } else {
@@ -228,10 +226,8 @@ impl eframe::App for App {
                 .rect_filled(bar_rect, 0.0, PROGRESS_TRACK_COLOR);
 
             let fill_width = bar_rect.width() * fraction;
-            let fill_rect = egui::Rect::from_min_size(
-                bar_rect.min,
-                egui::vec2(fill_width, PROGRESS_HEIGHT),
-            );
+            let fill_rect =
+                egui::Rect::from_min_size(bar_rect.min, egui::vec2(fill_width, PROGRESS_HEIGHT));
 
             if fill_width > 0.0 {
                 let seeking = self.pending_seek_position.is_some();
@@ -281,26 +277,6 @@ impl eframe::App for App {
                     self.fill_speed,
                     self.fill_resource.clone(),
                 );
-                if seeking {
-                    let shimmer_center = fill_rect.left()
-                        + ((time % SHIMMER_PERIOD as f32) / SHIMMER_PERIOD as f32) * fill_width;
-                    let shimmer_left = (shimmer_center - SHIMMER_WIDTH / 2.0).max(fill_rect.left());
-                    let shimmer_right =
-                        (shimmer_center + SHIMMER_WIDTH / 2.0).min(fill_rect.right());
-
-                    if shimmer_right > shimmer_left {
-                        let shimmer_rect = egui::Rect::from_x_y_ranges(
-                            shimmer_left..=shimmer_right,
-                            fill_rect.y_range(),
-                        );
-                        ui.painter().rect_filled(
-                            shimmer_rect,
-                            0.0,
-                            egui::Color32::from_white_alpha(SHIMMER_ALPHA),
-                        );
-                    }
-                }
-
                 ui.ctx().request_repaint();
             }
 
@@ -326,7 +302,8 @@ fn control_button(
     label: &str,
 ) -> egui::Response {
     let font = egui::FontId::proportional(CONTROL_FONT_SIZE);
-    let base_galley = crate::app::cached_galley(cache, ui.painter(), label, font.clone(), CONTROL_COLOR);
+    let base_galley =
+        crate::app::cached_galley(cache, ui.painter(), label, font.clone(), CONTROL_COLOR);
     let desired_size = base_galley.size() + CONTROL_PADDING * 2.0;
 
     let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
@@ -341,9 +318,16 @@ fn control_button(
         };
 
         if response.hovered() {
-            let bg_alpha = if response.is_pointer_button_down_on() { 25 } else { 12 };
-            ui.painter()
-                .rect_filled(rect, CONTROL_ROUNDING, egui::Color32::from_white_alpha(bg_alpha));
+            let bg_alpha = if response.is_pointer_button_down_on() {
+                25
+            } else {
+                12
+            };
+            ui.painter().rect_filled(
+                rect,
+                CONTROL_ROUNDING,
+                egui::Color32::from_white_alpha(bg_alpha),
+            );
         }
 
         let galley = crate::app::cached_galley(cache, ui.painter(), label, font, text_color);
@@ -402,7 +386,12 @@ fn ping_pong_offset(time: f64, overflow: f32) -> f32 {
 }
 
 fn rgb_norm(c: egui::Color32) -> [f32; 4] {
-    [c.r() as f32 / 255.0, c.g() as f32 / 255.0, c.b() as f32 / 255.0, c.a() as f32 / 255.0]
+    [
+        c.r() as f32 / 255.0,
+        c.g() as f32 / 255.0,
+        c.b() as f32 / 255.0,
+        c.a() as f32 / 255.0,
+    ]
 }
 
 fn format_time(seconds: f64) -> String {
