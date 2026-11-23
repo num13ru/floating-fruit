@@ -1,4 +1,5 @@
-//! Inter font setup for egui, plus CJK fallback fonts.
+//! Font setup for egui: Inter (proportional), IBM Plex Mono (monospace time),
+//! Noto Sans CJK fallbacks.
 
 use std::sync::Arc;
 
@@ -6,6 +7,9 @@ use eframe::egui;
 
 pub const INTER_FAMILY: &str = "Inter Variable";
 pub const INTER_BYTES: &[u8] = include_bytes!("../assets/fonts/InterVariable.ttf");
+
+pub const IBMPLEX_MONO_FAMILY: &str = "IBM Plex Mono";
+pub const IBM_PLEX_MONO_BYTES: &[u8] = include_bytes!("../assets/fonts/IBMPlexMono-Medium.ttf");
 
 const CJK_FONTS: &[(&str, &[u8])] = &[
     (
@@ -38,6 +42,10 @@ pub fn font_definitions() -> egui::FontDefinitions {
             Arc::new(egui::FontData::from_static(bytes)),
         );
     }
+    fonts.font_data.insert(
+        IBMPLEX_MONO_FAMILY.to_string(),
+        Arc::new(egui::FontData::from_static(IBM_PLEX_MONO_BYTES)),
+    );
     // Inter first, then CJK fallbacks, then built-in fonts for icons.
     let list = fonts
         .families
@@ -53,6 +61,19 @@ pub fn font_definitions() -> egui::FontDefinitions {
     list.push("Ubuntu-Light".to_string());
     list.push("NotoEmoji-Regular".to_string());
     list.push("emoji-icon-font".to_string());
+
+    // Monospace family: IBM Plex Mono first, built-ins retained.
+    let monospace = fonts
+        .families
+        .entry(egui::FontFamily::Monospace)
+        .or_default();
+    monospace.clear();
+    monospace.push(IBMPLEX_MONO_FAMILY.to_string());
+    monospace.push("Hack".to_string());
+    monospace.push("Ubuntu-Light".to_string());
+    monospace.push("NotoEmoji-Regular".to_string());
+    monospace.push("emoji-icon-font".to_string());
+
     fonts
 }
 
@@ -79,5 +100,19 @@ mod tests {
                 "missing font_data for {family}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod mono_tests {
+    use super::*;
+
+    #[test]
+    fn monospace_family_starts_with_ibmplex() {
+        let fonts = font_definitions();
+        let list = &fonts.families[&egui::FontFamily::Monospace];
+        assert_eq!(list[0], IBMPLEX_MONO_FAMILY);
+        assert!(fonts.font_data.contains_key(IBMPLEX_MONO_FAMILY));
+        assert!(list.contains(&"Hack".to_string()));
     }
 }

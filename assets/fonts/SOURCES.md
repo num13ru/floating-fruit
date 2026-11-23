@@ -2,6 +2,7 @@
 
 | File | Upstream | Revision | SHA-256 |
 | --- | --- | --- | --- |
+| `IBMPlexMono-Medium.ttf` | <https://github.com/IBM/plex> | `bc6a7e4b37634eb79785d59781893db63ee3edcb` | `98fbd727aae340b236955879dabed4d991aac9e8e90b3b2a67ce4a59221cc97c` |
 | `InterVariable.ttf` | <https://github.com/rsms/inter> | `353b61b9f4430d5f420d56605a6e7993e0941470` | `4989b125924991b90d05b2d16e0e388c48f7d5bb8b30539bbf9c755278d0ccaf` |
 | `NotoSansCJKjp-Regular.otf` | <https://github.com/notofonts/noto-cjk> | main | `68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5` |
 | `NotoSansCJKsc-Regular.otf` | <https://github.com/notofonts/noto-cjk> | main | `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` |
@@ -9,5 +10,6 @@
 | `NotoSansCJKkr-Regular.otf` | <https://github.com/notofonts/noto-cjk> | main | `6bcb2a0703aa137e874fc2dffa85f6c21ba9a67fa329e81b8c801663af7e992a` |
 
 Inter is distributed under the SIL Open Font License 1.1 — see
-`LICENSE-Inter.txt`. Noto Sans CJK (by Google and Adobe) is also licensed under
+`LICENSE-Inter.txt`. IBM Plex Mono (by IBM Corp.) is also licensed under the
+SIL Open Font License 1.1 — see `LICENSE-IBM-Plex.txt`. Noto Sans CJK (by Google and Adobe) is also licensed under
 the SIL Open Font License 1.1 — see `LICENSE-NotoSansCJK.txt`.

@@ -314,7 +314,10 @@ impl App {
     }
 }
 
-pub(crate) type GalleyCache = HashMap<(String, u32, egui::Color32), std::sync::Arc<egui::Galley>>;
+pub(crate) type GalleyCache = HashMap<
+    (String, egui::FontFamily, u32, egui::Color32),
+    std::sync::Arc<egui::Galley>,
+>;
 
 pub(crate) fn cached_galley(
     cache: &mut GalleyCache,
@@ -323,7 +326,7 @@ pub(crate) fn cached_galley(
     font: egui::FontId,
     color: egui::Color32,
 ) -> std::sync::Arc<egui::Galley> {
-    let key = (text.to_string(), font.size.to_bits(), color);
+    let key = (text.to_string(), font.family.clone(), font.size.to_bits(), color);
     if let Some(galley) = cache.get(&key) {
         return galley.clone();
     }

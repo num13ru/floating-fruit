@@ -264,7 +264,7 @@ impl eframe::App for App {
                 format_time(display_position),
                 format_time(duration),
             );
-            let font = egui::FontId::proportional(TIME_FONT_SIZE);
+            let font = egui::FontId::monospace(TIME_FONT_SIZE);
             let galley = self.cached_galley(ui.painter(), &time_text, font, TIME_COLOR);
             let text_pos = egui::pos2(
                 full_rect.left() + TIME_MARGIN_X,
