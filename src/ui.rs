@@ -236,34 +236,42 @@ impl eframe::App for App {
                 let pressed = bar_response.is_pointer_button_down_on();
                 let hovered = bar_response.hovered();
 
-                let color = if seeking {
-                    PROGRESS_FILL_SEEK_COLOR
+                let target_color = if seeking {
+                    rgb_norm(PROGRESS_FILL_SEEK_COLOR)
                 } else if pressed {
-                    PROGRESS_FILL_PRESSED_COLOR
+                    rgb_norm(PROGRESS_FILL_PRESSED_COLOR)
                 } else {
-                    PROGRESS_FILL_COLOR
+                    rgb_norm(PROGRESS_FILL_COLOR)
                 };
-                let intensity = if seeking {
+                let target_intensity = if seeking {
                     0.85
                 } else if hovered {
                     PROGRESS_FILL_HOVER_INTENSITY
                 } else {
                     1.0
                 };
-                let speed = if seeking {
+                let target_speed = if seeking {
                     PROGRESS_FILL_SEEK_SPEED
                 } else {
                     PROGRESS_FILL_SPEED
                 };
 
+                // Smoothly lerp toward the target state.
+                let lerp = 0.22f32;
+                for (i, target) in target_color.iter().enumerate() {
+                    self.fill_color[i] += (target - self.fill_color[i]) * lerp;
+                }
+                self.fill_intensity += (target_intensity - self.fill_intensity) * lerp;
+                self.fill_speed += (target_speed - self.fill_speed) * lerp;
+
                 let time = ui.ctx().input(|i| i.time) as f32;
                 crate::progressbar::paint_fill(
                     ui,
                     fill_rect,
-                    color,
+                    self.fill_color,
                     time,
-                    intensity,
-                    speed,
+                    self.fill_intensity,
+                    self.fill_speed,
                     self.fill_resource.clone(),
                 );
                 if seeking {
@@ -384,6 +392,10 @@ fn ping_pong_offset(time: f64, overflow: f32) -> f32 {
         let back = t - 2.0 * SCROLL_PAUSE - scroll_dur;
         (1.0 - (back / scroll_dur) as f32) * overflow
     }
+}
+
+fn rgb_norm(c: egui::Color32) -> [f32; 4] {
+    [c.r() as f32 / 255.0, c.g() as f32 / 255.0, c.b() as f32 / 255.0, c.a() as f32 / 255.0]
 }
 
 fn format_time(seconds: f64) -> String {

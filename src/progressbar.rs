@@ -56,7 +56,7 @@ impl FillUniforms {
     pub fn new(
         viewport: Rect,
         fill_rect: Rect,
-        color: eframe::egui::Color32,
+        color: [f32; 4],
         time: f32,
         intensity: f32,
         speed: f32,
@@ -75,12 +75,7 @@ impl FillUniforms {
                 fill_rect.max.x * pixels_per_point,
                 fill_rect.max.y * pixels_per_point,
             ],
-            color: [
-                color.r() as f32 / 255.0,
-                color.g() as f32 / 255.0,
-                color.b() as f32 / 255.0,
-                color.a() as f32 / 255.0,
-            ],
+            color,
             time,
             intensity,
             speed,
@@ -244,7 +239,7 @@ impl CallbackTrait for FillCallback {
 pub fn paint_fill(
     ui: &mut Ui,
     rect: Rect,
-    color: eframe::egui::Color32,
+    color: [f32; 4],
     time: f32,
     intensity: f32,
     speed: f32,
