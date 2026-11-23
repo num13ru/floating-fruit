@@ -242,11 +242,10 @@ pub fn paint_fill(
     color: [f32; 4],
     time: f32,
     intensity: f32,
-    speed: f32,
     resource: Arc<Mutex<Option<FillResources>>>,
 ) {
     let pixels_per_point = ui.ctx().pixels_per_point();
-    let uniforms = FillUniforms::new(rect, rect, color, time, intensity, speed, pixels_per_point);
+    let uniforms = FillUniforms::new(rect, rect, color, time, intensity, 1.0, pixels_per_point);
     let callback =
         egui_wgpu::Callback::new_paint_callback(rect, FillCallback::new(uniforms, resource));
     ui.painter().add(eframe::egui::Shape::Callback(callback));
