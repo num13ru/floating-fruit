@@ -119,13 +119,9 @@ end tell
         .trim()
         .parse()
         .with_context(|| format!("Failed to parse track id: {:?}", parts[5]))?;
-    let position: f64 = parts[6]
-        .trim()
-        .parse()
+    let position: f64 = parse_locale_float(parts[6])
         .with_context(|| format!("Failed to parse position: {:?}", parts[6]))?;
-    let duration: f64 = parts[7]
-        .trim()
-        .parse()
+    let duration: f64 = parse_locale_float(parts[7])
         .with_context(|| format!("Failed to parse duration: {:?}", parts[7]))?;
 
     Ok(Some(TrackInfo {
@@ -261,6 +257,22 @@ end tell
     Ok(())
 }
 
+fn parse_locale_float(s: &str) -> Result<f64> {
+    let trimmed = s.trim();
+    let normalized = if trimmed.contains(',') && trimmed.contains('.') {
+        trimmed
+            .chars()
+            .filter(|c| *c != '.')
+            .collect::<String>()
+            .replace(',', ".")
+    } else {
+        trimmed.replace(',', ".")
+    };
+    normalized
+        .parse()
+        .context("invalid float literal")
+}
+
 fn escape_applescript_string(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -284,6 +296,15 @@ mod tests {
             ArtworkExtraction::parse("__STALE__"),
             ArtworkExtraction::Stale
         );
+    }
+
+    #[test]
+    fn parse_locale_float_handles_comma_and_mixed_separators() {
+        let parse = |s: &str| super::parse_locale_float(s).unwrap();
+        assert!((parse("2,855000019073") - 2.855000019073).abs() < 1e-12);
+        assert!((parse("2.5") - 2.5).abs() < 1e-12);
+        assert!((parse("1.234,56") - 1234.56).abs() < 1e-12);
+        assert!(super::parse_locale_float("not-a-float").is_err());
     }
 
     #[test]
