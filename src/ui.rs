@@ -24,6 +24,8 @@ const PROGRESS_FILL_SEEK_COLOR: egui::Color32 = egui::Color32::from_rgb(150, 35,
 const PROGRESS_FILL_HOVER_INTENSITY: f32 = 1.35;
 const PROGRESS_FILL_SPEED: f32 = 1.0;
 const PROGRESS_FILL_SEEK_SPEED: f32 = 2.5;
+/// Time constant for easing the lava fill toward its target state.
+const FILL_TRANSITION_DURATION: f32 = 0.45;
 const SHIMMER_WIDTH: f32 = 40.0;
 const SHIMMER_PERIOD: f64 = 1.0;
 const SHIMMER_ALPHA: u8 = 30;
@@ -256,15 +258,20 @@ impl eframe::App for App {
                     PROGRESS_FILL_SPEED
                 };
 
-                // Smoothly lerp toward the target state.
-                let lerp = 0.22f32;
+                // Smoothly ease toward the target state over FILL_TRANSITION_DURATION.
+                let now = ui.ctx().input(|i| i.time) as f32;
+                let dt = self
+                    .fill_last_frame
+                    .map_or(0.016, |t| (now - t).clamp(0.0, 0.1));
+                self.fill_last_frame = Some(now);
+                let lerp = 1.0 - (-dt / FILL_TRANSITION_DURATION).exp();
                 for (i, target) in target_color.iter().enumerate() {
                     self.fill_color[i] += (target - self.fill_color[i]) * lerp;
                 }
                 self.fill_intensity += (target_intensity - self.fill_intensity) * lerp;
                 self.fill_speed += (target_speed - self.fill_speed) * lerp;
 
-                let time = ui.ctx().input(|i| i.time) as f32;
+                let time = now;
                 crate::progressbar::paint_fill(
                     ui,
                     fill_rect,
