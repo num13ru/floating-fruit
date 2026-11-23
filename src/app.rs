@@ -9,7 +9,8 @@ use std::{
 use anyhow::Result;
 use eframe::egui::{self, TextureHandle};
 
-use crate::{music, texture};
+use crate::{music, progressbar::FillResources, texture};
+use std::sync::{Arc, Mutex};
 
 const POLL_EVERY: Duration = Duration::from_secs(1);
 const POLL_CHECK: Duration = Duration::from_millis(50);
@@ -47,6 +48,7 @@ pub struct App {
     last_album_key: Option<String>,
     art_cache: VecDeque<(String, TextureHandle)>,
     pub(crate) galley_cache: GalleyCache,
+    pub(crate) fill_resource: Arc<Mutex<Option<FillResources>>>,
     poll_pending: bool,
     next_query_id: u64,
     latest_query_id: Option<u64>,
@@ -91,6 +93,7 @@ impl App {
             last_album_key: None,
             art_cache: VecDeque::new(),
             galley_cache: HashMap::new(),
+            fill_resource: Arc::new(Mutex::new(None)),
             poll_pending: false,
             next_query_id: 1,
             latest_query_id: None,
@@ -359,7 +362,7 @@ fn sweep_artwork_temp_files() {
 mod tests {
     use std::{
         collections::{HashMap, VecDeque},
-        sync::mpsc,
+        sync::{mpsc, Arc, Mutex},
         time::{Duration, Instant},
     };
 
@@ -383,6 +386,7 @@ mod tests {
             last_album_key: None,
             art_cache: VecDeque::new(),
             galley_cache: HashMap::new(),
+            fill_resource: Arc::new(Mutex::new(None)),
             poll_pending: false,
             next_query_id: 1,
             latest_query_id: None,

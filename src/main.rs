@@ -1,6 +1,7 @@
 mod app;
 mod fonts;
 mod music;
+mod progressbar;
 mod texture;
 mod ui;
 

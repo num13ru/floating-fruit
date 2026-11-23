@@ -18,12 +18,12 @@ const CONTROL_PADDING: egui::Vec2 = egui::vec2(10.0, 6.0);
 const CONTROL_ROUNDING: f32 = 4.0;
 const PROGRESS_HEIGHT: f32 = 20.0;
 const PROGRESS_TRACK_COLOR: egui::Color32 = egui::Color32::from_gray(40);
-const PROGRESS_FILL_COLOR: egui::Color32 = egui::Color32::from_gray(120);
-const PROGRESS_FILL_HOVER_COLOR: egui::Color32 = egui::Color32::from_gray(160);
-const PROGRESS_FILL_PRESSED_COLOR: egui::Color32 = egui::Color32::from_gray(100);
-const SHIMMER_WIDTH: f32 = 40.0;
-const SHIMMER_PERIOD: f64 = 1.0;
-const SHIMMER_ALPHA: u8 = 30;
+const PROGRESS_FILL_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 205, 215);
+const PROGRESS_FILL_PRESSED_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 140, 40);
+const PROGRESS_FILL_SEEK_COLOR: egui::Color32 = egui::Color32::from_rgb(220, 60, 60);
+const PROGRESS_FILL_HOVER_INTENSITY: f32 = 1.35;
+const PROGRESS_FILL_SPEED: f32 = 1.0;
+const PROGRESS_FILL_SEEK_SPEED: f32 = 2.5;
 const TIME_FONT_SIZE: f32 = 14.0;
 const TIME_COLOR: egui::Color32 = egui::Color32::from_gray(140);
 const TIME_MARGIN_BOTTOM: f32 = 2.0;
@@ -219,14 +219,6 @@ impl eframe::App for App {
                 self.seek(f as f64 * duration);
             }
 
-            let fill_color = if bar_response.is_pointer_button_down_on() {
-                PROGRESS_FILL_PRESSED_COLOR
-            } else if bar_response.hovered() {
-                PROGRESS_FILL_HOVER_COLOR
-            } else {
-                PROGRESS_FILL_COLOR
-            };
-
             ui.painter()
                 .rect_filled(bar_rect, 0.0, PROGRESS_TRACK_COLOR);
 
@@ -235,27 +227,42 @@ impl eframe::App for App {
                 bar_rect.min,
                 egui::vec2(fill_width, PROGRESS_HEIGHT),
             );
-            ui.painter().rect_filled(fill_rect, 0.0, fill_color);
 
-            if self.pending_seek_position.is_some() && fill_width > 0.0 {
-                let time = ui.ctx().input(|i| i.time);
-                let phase = ((time % SHIMMER_PERIOD) / SHIMMER_PERIOD) as f32;
-                let shimmer_center = fill_rect.left() + phase * fill_width;
-                let shimmer_left = (shimmer_center - SHIMMER_WIDTH / 2.0).max(fill_rect.left());
-                let shimmer_right = (shimmer_center + SHIMMER_WIDTH / 2.0).min(fill_rect.right());
+            if fill_width > 0.0 {
+                let seeking = self.pending_seek_position.is_some();
+                let pressed = bar_response.is_pointer_button_down_on();
+                let hovered = bar_response.hovered();
 
-                if shimmer_right > shimmer_left {
-                    let shimmer_rect = egui::Rect::from_x_y_ranges(
-                        shimmer_left..=shimmer_right,
-                        fill_rect.y_range(),
-                    );
-                    ui.painter().rect_filled(
-                        shimmer_rect,
-                        0.0,
-                        egui::Color32::from_white_alpha(SHIMMER_ALPHA),
-                    );
-                }
+                let color = if seeking {
+                    PROGRESS_FILL_SEEK_COLOR
+                } else if pressed {
+                    PROGRESS_FILL_PRESSED_COLOR
+                } else {
+                    PROGRESS_FILL_COLOR
+                };
+                let intensity = if seeking {
+                    1.3
+                } else if hovered {
+                    PROGRESS_FILL_HOVER_INTENSITY
+                } else {
+                    1.0
+                };
+                let speed = if seeking {
+                    PROGRESS_FILL_SEEK_SPEED
+                } else {
+                    PROGRESS_FILL_SPEED
+                };
 
+                let time = ui.ctx().input(|i| i.time) as f32;
+                crate::progressbar::paint_fill(
+                    ui,
+                    fill_rect,
+                    color,
+                    time,
+                    intensity,
+                    speed,
+                    self.fill_resource.clone(),
+                );
                 ui.ctx().request_repaint();
             }
 
