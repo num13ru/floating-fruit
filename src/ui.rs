@@ -24,6 +24,9 @@ const PROGRESS_FILL_SEEK_COLOR: egui::Color32 = egui::Color32::from_rgb(220, 60,
 const PROGRESS_FILL_HOVER_INTENSITY: f32 = 1.35;
 const PROGRESS_FILL_SPEED: f32 = 1.0;
 const PROGRESS_FILL_SEEK_SPEED: f32 = 2.5;
+const SHIMMER_WIDTH: f32 = 40.0;
+const SHIMMER_PERIOD: f64 = 1.0;
+const SHIMMER_ALPHA: u8 = 30;
 const TIME_FONT_SIZE: f32 = 14.0;
 const TIME_COLOR: egui::Color32 = egui::Color32::from_gray(140);
 const TIME_MARGIN_BOTTOM: f32 = 2.0;
@@ -263,6 +266,26 @@ impl eframe::App for App {
                     speed,
                     self.fill_resource.clone(),
                 );
+                if seeking {
+                    let shimmer_center = fill_rect.left()
+                        + ((time % SHIMMER_PERIOD as f32) / SHIMMER_PERIOD as f32) * fill_width;
+                    let shimmer_left = (shimmer_center - SHIMMER_WIDTH / 2.0).max(fill_rect.left());
+                    let shimmer_right =
+                        (shimmer_center + SHIMMER_WIDTH / 2.0).min(fill_rect.right());
+
+                    if shimmer_right > shimmer_left {
+                        let shimmer_rect = egui::Rect::from_x_y_ranges(
+                            shimmer_left..=shimmer_right,
+                            fill_rect.y_range(),
+                        );
+                        ui.painter().rect_filled(
+                            shimmer_rect,
+                            0.0,
+                            egui::Color32::from_white_alpha(SHIMMER_ALPHA),
+                        );
+                    }
+                }
+
                 ui.ctx().request_repaint();
             }
 
