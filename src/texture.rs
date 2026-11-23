@@ -5,7 +5,7 @@ use eframe::egui::{self, ColorImage, TextureHandle};
 
 const MAX_TEXTURE_DIM: u32 = 400;
 
-pub fn load_from_file(ctx: &egui::Context, path: &Path) -> Result<TextureHandle> {
+pub fn load_from_file(ctx: &egui::Context, path: &Path, name: &str) -> Result<TextureHandle> {
     let bytes = fs::read(path).with_context(|| format!("Failed reading {}", path.display()))?;
     let mut image = image::load_from_memory(&bytes)
         .with_context(|| format!("Failed decoding {}", path.display()))?;
@@ -23,5 +23,5 @@ pub fn load_from_file(ctx: &egui::Context, path: &Path) -> Result<TextureHandle>
     let pixels = rgba.into_vec();
     let color_image = ColorImage::from_rgba_unmultiplied(size, &pixels);
 
-    Ok(ctx.load_texture("album_art", color_image, egui::TextureOptions::LINEAR))
+    Ok(ctx.load_texture(name, color_image, egui::TextureOptions::LINEAR))
 }

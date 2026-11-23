@@ -1,4 +1,6 @@
 use std::{
+    collections::{HashMap, VecDeque},
+    hash::{DefaultHasher, Hasher},
     sync::mpsc,
     thread,
     time::{Duration, Instant},
@@ -15,6 +17,7 @@ const COMMAND_SETTLE: Duration = Duration::from_millis(200);
 const INTERPOLATION_STEP: Duration = Duration::from_millis(200);
 const SEEK_CONFIRM_TOLERANCE: f64 = 2.0;
 const ART_CACHE_CAP: usize = 10;
+const GALLEY_CACHE_CAP: usize = 128;
 
 type PollResult = Result<Option<music::TrackInfo>>;
 
@@ -42,7 +45,8 @@ pub struct App {
     poll_instant: Instant,
     last_track_id: Option<i64>,
     last_album_key: Option<String>,
-    art_cache: Vec<(String, TextureHandle)>,
+    art_cache: VecDeque<(String, TextureHandle)>,
+    pub(crate) galley_cache: GalleyCache,
     poll_pending: bool,
     next_query_id: u64,
     latest_query_id: Option<u64>,
@@ -75,6 +79,8 @@ impl App {
             }
         });
 
+        sweep_artwork_temp_files();
+
         Self {
             track: None,
             cover_texture: None,
@@ -83,7 +89,8 @@ impl App {
             poll_instant: Instant::now(),
             last_track_id: None,
             last_album_key: None,
-            art_cache: Vec::new(),
+            art_cache: VecDeque::new(),
+            galley_cache: HashMap::new(),
             poll_pending: false,
             next_query_id: 1,
             latest_query_id: None,
@@ -217,15 +224,20 @@ impl App {
         }
 
         match result {
-            Ok(music::ArtworkExtraction::Path(path)) => match texture::load_from_file(ctx, &path) {
-                Ok(tex) => {
-                    self.cover_texture = Some(tex.clone());
-                    self.art_cache_insert(request.album_key, tex);
+            Ok(music::ArtworkExtraction::Path(path)) => {
+                let name = texture_name_for(&request.album_key);
+                let result = texture::load_from_file(ctx, &path, &name);
+                let _ = std::fs::remove_file(&path);
+                match result {
+                    Ok(tex) => {
+                        self.cover_texture = Some(tex.clone());
+                        self.art_cache_insert(request.album_key, tex);
+                    }
+                    Err(err) => {
+                        self.last_error = Some(format!("Failed to load artwork: {err:#}"));
+                    }
                 }
-                Err(err) => {
-                    self.last_error = Some(format!("Failed to load artwork: {err:#}"));
-                }
-            },
+            }
             Ok(music::ArtworkExtraction::Missing) => {
                 self.cover_texture = None;
             }
@@ -238,18 +250,28 @@ impl App {
 
     fn art_cache_get(&mut self, key: &str) -> Option<TextureHandle> {
         let idx = self.art_cache.iter().position(|(k, _)| k == key)?;
-        let entry = self.art_cache.remove(idx);
+        let entry = self.art_cache.remove(idx).unwrap();
         let tex = entry.1.clone();
-        self.art_cache.push(entry);
+        self.art_cache.push_back(entry);
         Some(tex)
     }
 
     fn art_cache_insert(&mut self, key: String, tex: TextureHandle) {
         self.art_cache.retain(|(k, _)| k != &key);
-        self.art_cache.push((key, tex));
-        if self.art_cache.len() > ART_CACHE_CAP {
-            drop(self.art_cache.remove(0));
+        self.art_cache.push_back((key, tex));
+        while self.art_cache.len() > ART_CACHE_CAP {
+            self.art_cache.pop_front();
         }
+    }
+
+    pub(crate) fn cached_galley(
+        &mut self,
+        painter: &egui::Painter,
+        text: &str,
+        font: egui::FontId,
+        color: egui::Color32,
+    ) -> std::sync::Arc<egui::Galley> {
+        cached_galley(&mut self.galley_cache, painter, text, font, color)
     }
 
     pub(crate) fn effective_position(&self) -> f64 {
@@ -292,9 +314,48 @@ impl App {
     }
 }
 
+pub(crate) type GalleyCache = HashMap<(String, u32, egui::Color32), std::sync::Arc<egui::Galley>>;
+
+pub(crate) fn cached_galley(
+    cache: &mut GalleyCache,
+    painter: &egui::Painter,
+    text: &str,
+    font: egui::FontId,
+    color: egui::Color32,
+) -> std::sync::Arc<egui::Galley> {
+    let key = (text.to_string(), font.size.to_bits(), color);
+    if let Some(galley) = cache.get(&key) {
+        return galley.clone();
+    }
+    let galley = painter.layout_no_wrap(text.to_string(), font, color);
+    if cache.len() >= GALLEY_CACHE_CAP {
+        cache.clear();
+    }
+    cache.insert(key, galley.clone());
+    galley
+}
+
+fn texture_name_for(album_key: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    hasher.write(album_key.as_bytes());
+    format!("album_art_{:x}", hasher.finish())
+}
+
+fn sweep_artwork_temp_files() {
+    let Ok(rd) = std::fs::read_dir(std::env::temp_dir()) else { return };
+    for entry in rd.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if name.starts_with("am_now_playing_artwork_") {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::{HashMap, VecDeque},
         sync::mpsc,
         time::{Duration, Instant},
     };
@@ -317,7 +378,8 @@ mod tests {
             poll_instant: Instant::now(),
             last_track_id: None,
             last_album_key: None,
-            art_cache: Vec::new(),
+            art_cache: VecDeque::new(),
+            galley_cache: HashMap::new(),
             poll_pending: false,
             next_query_id: 1,
             latest_query_id: None,

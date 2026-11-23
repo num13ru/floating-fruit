@@ -50,14 +50,20 @@ impl eframe::App for App {
         ui.visuals_mut().override_text_color = Some(egui::Color32::WHITE);
 
         let mut pending_command: Option<PlayerCommand> = None;
+        let mut reveal_requested = false;
+
+        let track_snapshot = self.track.clone();
+        let last_error_snapshot = self.last_error.clone();
+        let cover_texture_snapshot = self.cover_texture.clone();
+        let has_track = track_snapshot.is_some();
+        let cache = &mut self.galley_cache;
 
         ui.horizontal(|ui| {
             let cover_size = egui::vec2(COVER_SIZE, COVER_SIZE);
-            let has_track = self.track.is_some();
             let sense = if has_track { egui::Sense::click() } else { egui::Sense::hover() };
             let (cover_rect, cover_response) = ui.allocate_exact_size(cover_size, sense);
 
-            if let Some(texture) = &self.cover_texture {
+            if let Some(texture) = &cover_texture_snapshot {
                 let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
                 ui.painter().image(texture.id(), cover_rect, uv, egui::Color32::WHITE);
             } else {
@@ -82,7 +88,7 @@ impl eframe::App for App {
             }
 
             if cover_response.clicked() && has_track {
-                self.reveal_in_app();
+                reveal_requested = true;
             }
 
             ui.add_space(8.0);
@@ -90,9 +96,10 @@ impl eframe::App for App {
             ui.vertical(|ui| {
                 ui.add_space(8.0);
 
-                if let Some(track) = &self.track {
+                if let Some(track) = &track_snapshot {
                     scrolling_label(
                         ui,
+                        &mut *cache,
                         &track.title,
                         egui::FontId::proportional(18.0),
                         egui::Color32::WHITE,
@@ -100,6 +107,7 @@ impl eframe::App for App {
                     ui.add_space(4.0);
                     scrolling_label(
                         ui,
+                        &mut *cache,
                         &track.artist,
                         egui::FontId::proportional(14.0),
                         egui::Color32::from_gray(190),
@@ -107,6 +115,7 @@ impl eframe::App for App {
                     ui.add_space(2.0);
                     scrolling_label(
                         ui,
+                        &mut *cache,
                         &track.album,
                         egui::FontId::proportional(12.0),
                         egui::Color32::from_gray(150),
@@ -121,17 +130,17 @@ impl eframe::App for App {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
 
-                        if control_button(ui, "⏮").clicked() {
+                        if control_button(ui, &mut *cache, "⏮").clicked() {
                             pending_command = Some(PlayerCommand::Previous);
                         }
-                        if control_button(ui, play_pause_label).clicked() {
+                        if control_button(ui, &mut *cache, play_pause_label).clicked() {
                             pending_command = Some(PlayerCommand::PlayPause);
                         }
-                        if control_button(ui, "⏭").clicked() {
+                        if control_button(ui, &mut *cache, "⏭").clicked() {
                             pending_command = Some(PlayerCommand::Next);
                         }
                     });
-                } else if let Some(err) = &self.last_error {
+                } else if let Some(err) = &last_error_snapshot {
                     ui.label(
                         RichText::new("Apple Music unavailable")
                             .strong()
@@ -161,15 +170,22 @@ impl eframe::App for App {
             });
         });
 
+        if reveal_requested {
+            self.reveal_in_app();
+        }
+
         if let Some(cmd) = pending_command {
             self.execute_command(cmd);
         }
 
-        if let Some(track) = &self.track
-            && track.duration > 0.0
-        {
+        let draw_seekbar = self
+            .track
+            .as_ref()
+            .is_some_and(|t| t.duration > 0.0);
+
+        if draw_seekbar {
+            let duration = self.track.as_ref().unwrap().duration;
             let full_rect = ui.max_rect();
-            let duration = track.duration;
             let base_position = self.effective_position();
 
             let bar_top = full_rect.bottom() - PROGRESS_HEIGHT;
@@ -249,9 +265,7 @@ impl eframe::App for App {
                 format_time(duration),
             );
             let font = egui::FontId::proportional(TIME_FONT_SIZE);
-            let galley = ui
-                .painter()
-                .layout_no_wrap(time_text, font, TIME_COLOR);
+            let galley = self.cached_galley(ui.painter(), &time_text, font, TIME_COLOR);
             let text_pos = egui::pos2(
                 full_rect.left() + TIME_MARGIN_X,
                 bar_top - galley.size().y - TIME_MARGIN_BOTTOM,
@@ -261,11 +275,13 @@ impl eframe::App for App {
     }
 }
 
-fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
+fn control_button(
+    ui: &mut egui::Ui,
+    cache: &mut crate::app::GalleyCache,
+    label: &str,
+) -> egui::Response {
     let font = egui::FontId::proportional(CONTROL_FONT_SIZE);
-    let base_galley =
-        ui.painter()
-            .layout_no_wrap(label.to_string(), font.clone(), CONTROL_COLOR);
+    let base_galley = crate::app::cached_galley(cache, ui.painter(), label, font.clone(), CONTROL_COLOR);
     let desired_size = base_galley.size() + CONTROL_PADDING * 2.0;
 
     let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
@@ -285,12 +301,7 @@ fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
                 .rect_filled(rect, CONTROL_ROUNDING, egui::Color32::from_white_alpha(bg_alpha));
         }
 
-        let galley = if text_color == CONTROL_COLOR {
-            base_galley
-        } else {
-            ui.painter()
-                .layout_no_wrap(label.to_string(), font, text_color)
-        };
+        let galley = crate::app::cached_galley(cache, ui.painter(), label, font, text_color);
 
         let text_pos = rect.center() - galley.size() / 2.0;
         ui.painter().galley(text_pos, galley, text_color);
@@ -299,11 +310,15 @@ fn control_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
     response
 }
 
-fn scrolling_label(ui: &mut egui::Ui, text: &str, font: egui::FontId, color: egui::Color32) {
+fn scrolling_label(
+    ui: &mut egui::Ui,
+    cache: &mut crate::app::GalleyCache,
+    text: &str,
+    font: egui::FontId,
+    color: egui::Color32,
+) {
     let max_width = ui.available_width();
-    let galley = ui
-        .painter()
-        .layout_no_wrap(text.to_string(), font, color);
+    let galley = crate::app::cached_galley(cache, ui.painter(), text, font, color);
     let text_width = galley.size().x;
 
     if text_width <= max_width {
